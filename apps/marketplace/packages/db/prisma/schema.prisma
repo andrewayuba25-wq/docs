@@ -1,0 +1,314 @@
+// Prisma schema for the Artisan service marketplace.
+// PostGIS columns are added via a raw SQL migration (see migrations/001_postgis.sql)
+// and queried with $queryRaw for nearby-radius searches.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  CUSTOMER
+  ARTISAN
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  BANNED
+  PENDING_VERIFICATION
+}
+
+enum DocKind {
+  ID_FRONT
+  ID_BACK
+  SELFIE
+  TRADE_LICENSE
+}
+
+enum DocStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum BookingStatus {
+  REQUESTED
+  ACCEPTED
+  REJECTED
+  EN_ROUTE
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MsgKind {
+  TEXT
+  IMAGE
+  LOCATION
+  SYSTEM
+}
+
+enum PaymentStatus {
+  HELD
+  CAPTURED
+  REFUNDED
+  FAILED
+  PAID_OUT
+}
+
+enum ReportStatus {
+  OPEN
+  REVIEWING
+  RESOLVED
+  DISMISSED
+}
+
+model User {
+  id              String     @id @default(cuid())
+  phone           String     @unique
+  phoneVerifiedAt DateTime?
+  email           String?    @unique
+  passwordHash    String?
+  role            Role       @default(CUSTOMER)
+  fullName        String?
+  avatarUrl       String?
+  status          UserStatus @default(ACTIVE)
+
+  pushTokens      PushToken[]
+  customer        CustomerProfile?
+  artisan         ArtisanProfile?
+  bookingsAsCust  Booking[]   @relation("CustomerBookings")
+  reviewsAuthored Review[]    @relation("Reviewer")
+  reviewsReceived Review[]    @relation("Reviewee")
+  favorites       Favorite[]
+  reports         Report[]    @relation("Reporter")
+  reportsAgainst  Report[]    @relation("Reported")
+  chatMessages    ChatMessage[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([role, status])
+}
+
+model CustomerProfile {
+  userId   String  @id
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  homeLat  Float?
+  homeLng  Float?
+  homeAddr String?
+}
+
+model ArtisanProfile {
+  userId          String   @id
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bio             String?
+  yearsExperience Int      @default(0)
+  baseRateCents   Int      @default(0)
+  hourlyRateCents Int      @default(0)
+  available       Boolean  @default(false)
+  currentLat      Float?
+  currentLng      Float?
+  avgRating       Float    @default(0)
+  ratingCount     Int      @default(0)
+  completedJobs   Int      @default(0)
+  verifiedAt      DateTime?
+
+  categories ArtisanCategory[]
+  documents  VerificationDoc[]
+  portfolio  PortfolioItem[]
+  bookings   Booking[]         @relation("ArtisanBookings")
+  favoritedBy Favorite[]
+
+  @@index([available, avgRating])
+}
+
+model ServiceCategory {
+  id       String  @id @default(cuid())
+  slug     String  @unique
+  name     String
+  iconKey  String?
+  active   Boolean @default(true)
+
+  artisans ArtisanCategory[]
+  bookings Booking[]
+}
+
+model ArtisanCategory {
+  artisanId  String
+  categoryId String
+  artisan    ArtisanProfile  @relation(fields: [artisanId], references: [userId], onDelete: Cascade)
+  category   ServiceCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@id([artisanId, categoryId])
+}
+
+model VerificationDoc {
+  id         String    @id @default(cuid())
+  artisanId  String
+  artisan    ArtisanProfile @relation(fields: [artisanId], references: [userId], onDelete: Cascade)
+  kind       DocKind
+  s3Key      String
+  status     DocStatus @default(PENDING)
+  reviewerId String?
+  reviewedAt DateTime?
+  notes      String?
+  createdAt  DateTime  @default(now())
+}
+
+model PortfolioItem {
+  id        String   @id @default(cuid())
+  artisanId String
+  artisan   ArtisanProfile @relation(fields: [artisanId], references: [userId], onDelete: Cascade)
+  s3Key     String
+  caption   String?
+  createdAt DateTime @default(now())
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  customerId   String
+  artisanId    String
+  categoryId   String
+  customer     User          @relation("CustomerBookings", fields: [customerId], references: [id])
+  artisan      ArtisanProfile @relation("ArtisanBookings", fields: [artisanId], references: [userId])
+  category     ServiceCategory @relation(fields: [categoryId], references: [id])
+  status       BookingStatus @default(REQUESTED)
+  scheduledFor DateTime?
+  description  String
+  addressText  String
+  addressLat   Float
+  addressLng   Float
+  priceCents   Int?
+  isEmergency  Boolean       @default(false)
+  acceptedAt   DateTime?
+  startedAt    DateTime?
+  completedAt  DateTime?
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  chatThread ChatThread?
+  payment    Payment?
+  review     Review?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([artisanId, status])
+  @@index([customerId, status])
+  @@index([status, isEmergency, createdAt])
+}
+
+model Review {
+  id         String   @id @default(cuid())
+  bookingId  String   @unique
+  booking    Booking  @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  reviewerId String
+  revieweeId String
+  reviewer   User     @relation("Reviewer", fields: [reviewerId], references: [id])
+  reviewee   User     @relation("Reviewee", fields: [revieweeId], references: [id])
+  rating     Int
+  comment    String?
+  createdAt  DateTime @default(now())
+}
+
+model ChatThread {
+  id        String        @id @default(cuid())
+  bookingId String        @unique
+  booking   Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+  lastMsgAt DateTime?
+}
+
+model ChatMessage {
+  id        String     @id @default(cuid())
+  threadId  String
+  thread    ChatThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User       @relation(fields: [senderId], references: [id])
+  body      String
+  kind      MsgKind    @default(TEXT)
+  s3Key     String?
+  lat       Float?
+  lng       Float?
+  readAt    DateTime?
+  createdAt DateTime   @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  bookingId       String        @unique
+  booking         Booking       @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  amountCents     Int
+  commissionCents Int
+  status          PaymentStatus
+  provider        String
+  intentId        String?
+  payoutId        String?
+  createdAt       DateTime      @default(now())
+}
+
+model Favorite {
+  userId    String
+  artisanId String
+  user      User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  artisan   ArtisanProfile @relation(fields: [artisanId], references: [userId], onDelete: Cascade)
+  createdAt DateTime       @default(now())
+
+  @@id([userId, artisanId])
+}
+
+model Report {
+  id         String       @id @default(cuid())
+  reporterId String
+  reportedId String
+  bookingId  String?
+  reason     String
+  details    String?
+  status     ReportStatus @default(OPEN)
+  reporter   User         @relation("Reporter", fields: [reporterId], references: [id])
+  reported   User         @relation("Reported", fields: [reportedId], references: [id])
+  createdAt  DateTime     @default(now())
+}
+
+model PushToken {
+  id       String @id @default(cuid())
+  userId   String
+  token    String @unique
+  platform String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  tokenHash  String   @unique
+  family     String
+  revokedAt  DateTime?
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([userId])
+}

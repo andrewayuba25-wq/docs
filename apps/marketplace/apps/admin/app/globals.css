@@ -1,0 +1,50 @@
+:root {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --border: #e2e8f0;
+  --text: #0f172a;
+  --muted: #475569;
+  --primary: #2563eb;
+  --danger: #dc2626;
+  --success: #16a34a;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0b1220;
+    --surface: #0f172a;
+    --border: #1e293b;
+    --text: #f8fafc;
+    --muted: #94a3b8;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; }
+a { color: var(--primary); text-decoration: none; }
+
+.layout { display: flex; min-height: 100vh; }
+.sidebar { width: 240px; background: var(--surface); border-right: 1px solid var(--border); padding: 24px; }
+.sidebar h1 { font-size: 18px; margin: 0 0 24px 0; }
+.sidebar nav { display: flex; flex-direction: column; gap: 6px; }
+.sidebar nav a { padding: 8px 10px; border-radius: 8px; color: var(--text); }
+.sidebar nav a:hover { background: var(--bg); }
+.main { flex: 1; padding: 32px; max-width: 1200px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 16px; margin-bottom: 32px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+.card .label { color: var(--muted); font-size: 13px; }
+.card .value { font-size: 28px; font-weight: 700; margin-top: 4px; }
+
+table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; overflow: hidden; }
+th, td { padding: 12px 14px; text-align: left; border-bottom: 1px solid var(--border); }
+th { background: var(--bg); font-weight: 600; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.04em; }
+tr:last-child td { border-bottom: none; }
+.badge { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+.badge.ok { background: rgba(22, 163, 74, 0.15); color: var(--success); }
+.badge.warn { background: rgba(217, 119, 6, 0.15); color: #d97706; }
+.badge.danger { background: rgba(220, 38, 38, 0.15); color: var(--danger); }
+
+button { background: var(--primary); color: white; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+button.ghost { background: transparent; color: var(--primary); border: 1px solid var(--border); }
+button.danger { background: var(--danger); }
