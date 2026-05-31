@@ -41,4 +41,21 @@ The data is then rendered by `components/landing`.
 
 ## Schema enforcement
 
-TODO
+The data files in `data/product-examples` are validated against the JSON schema defined in [`src/data-directory/lib/data-schemas/product-examples.ts`](/src/data-directory/lib/data-schemas/product-examples.ts).
+
+Each file must be an array of example entries. Every entry requires a `description` and may include the following properties, depending on the example type:
+
+| Property | Type | Description |
+| --- | --- | --- |
+| `description` | string | **Required.** Short description shown on the example. |
+| `repo` | string | Used by community examples (e.g. `discussions`). The `owner/name` of the repository. |
+| `user` | string | Used by user examples (e.g. `sponsors`). The username of the account. |
+| `title` | string | Used by code examples. The heading shown on the example card. |
+| `href` | string | Used by code examples. The link the example points to. |
+| `languages` | array of strings | Optional list of languages. May be left empty (`null`). |
+| `tags` | array of strings | Tags used to categorize the example. |
+| `versions` | string or object | Restricts the example to specific versions, using the same syntax as the [frontmatter `versions` property](/content/README.md). |
+
+No other properties are allowed.
+
+The schema is registered in [`src/data-directory/lib/data-schemas/index.ts`](/src/data-directory/lib/data-schemas/index.ts), which means every YML file under `data/product-examples` is validated against it by the data schema test in `src/data-directory/tests/data-schemas.ts` (and the content linter). A file that does not match the schema will fail those checks.

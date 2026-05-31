@@ -54,6 +54,7 @@ const manualSchemas: DataSchemas = {
   'data/code-languages.yml': resolveSchemaPath('code-languages.ts'),
   'data/glossaries/candidates.yml': resolveSchemaPath('glossaries-candidates.ts'),
   'data/glossaries/external.yml': resolveSchemaPath('glossaries-external.ts'),
+  'data/product-examples': resolveSchemaPath('product-examples.ts'),
 }
 
 // Combine manual registrations with auto-discovered table schemas
