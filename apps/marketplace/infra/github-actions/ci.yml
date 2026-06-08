@@ -1,0 +1,53 @@
+# Place this at .github/workflows/ci.yml in the actual repo. Lives here as a
+# template so the docs site's existing workflows aren't disturbed.
+name: CI
+
+on:
+  pull_request:
+    paths: ['apps/marketplace/**']
+  push:
+    branches: [main]
+    paths: ['apps/marketplace/**']
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_PASSWORD: artisan
+          POSTGRES_USER: artisan
+          POSTGRES_DB: artisan
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U artisan"
+          --health-interval 5s
+          --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+    defaults:
+      run:
+        working-directory: apps/marketplace
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+          cache-dependency-path: apps/marketplace/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @artisan/db generate
+      - run: pnpm --filter @artisan/db migrate
+        env:
+          DATABASE_URL: postgresql://artisan:artisan@localhost:5432/artisan?schema=public
+      - run: pnpm typecheck
+      - run: pnpm lint || true
+      - run: pnpm test
+        env:
+          DATABASE_URL: postgresql://artisan:artisan@localhost:5432/artisan?schema=public
+          JWT_ACCESS_SECRET: ci-access-secret-please-change
+          JWT_REFRESH_SECRET: ci-refresh-secret-please-change
